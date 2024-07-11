@@ -5,6 +5,7 @@ def circuit_to_dag(circuit):
     '''
     Inputs:
         - circuit: Qiskit circuit to convert to DAG
+        - draw: if True, draws DAG labeled with node labels and gate type
     Outputs:
         - dag: networkx DAG representation of the input circuit
         - node_label_to_gate: Dict with keys given by DAG node labels (int) and values given by
