@@ -13,7 +13,7 @@ def convert_angle(angle):
     assert abs(angle) <= np.pi
     return angle
 
-def get_axial_decomposition_angles(moment,eta=0):
+def get_axial_decomposition_angles(moment,circuit,eta=0):
     '''
     For a given moment in the circuit containing only u3 gates, return the Rz and GR angles
     necessary to decompose into the neutral atom gate set using the axial decomposition method.
@@ -47,7 +47,7 @@ def get_axial_decomposition_angles(moment,eta=0):
         lambda_ = float(euler_angles[2])
         rz_angles_this_op = {'first': lambda_ + eta, 'middle': theta_, 'last': phi_ - eta}
 
-        qubit = op[1][0].index
+        qubit = circuit.find_bit(op[1][0]).index
         assert all([qubit not in angles_all['rz'][x] for x in 
                     ['first','middle','last']]), 'Maximum one u3 gate on each qubit per moment'
         for x in rz_angles_this_op:
@@ -55,7 +55,7 @@ def get_axial_decomposition_angles(moment,eta=0):
                 
     return angles_all
 
-def get_transverse_decomposition_angles(moment,eta=0,sign_theta_max=1,sign_sigma_j=1):
+def get_transverse_decomposition_angles(moment,circuit,eta=0,sign_theta_max=1,sign_sigma_j=1):
     '''
     Similar to get_axial_decomposition_angles, except using transverse decomposition method. 
     For a given moment of u3 gates, the transverse decomposition minimizes GR rotation amount.
@@ -94,7 +94,7 @@ def get_transverse_decomposition_angles(moment,eta=0,sign_theta_max=1,sign_sigma
         
         rz_angles_this_op = {'first': gamma_plus+eta, 'middle': chi, 'last': gamma_minus-eta}
         
-        qubit = op[1][0].index
+        qubit = circuit.find_bit(op[1][0]).index
         assert all([qubit not in angles_all['rz'][x] for x in 
                     ['first','middle','last']]), 'Maximum one u3 gate on each qubit per moment'
         for x in rz_angles_this_op:
@@ -102,7 +102,7 @@ def get_transverse_decomposition_angles(moment,eta=0,sign_theta_max=1,sign_sigma
                 
     return angles_all
 
-def decompose_to_neutral_atom_gate_set(schedule,n,decomposition_type='transverse',use_backlog=True,
+def decompose_to_neutral_atom_gate_set(schedule,decomposition_type='transverse',use_backlog=True,
                                        eta=0,sign_theta_max=1,sign_sigma_j=1):
     '''
     Given a circuit in terms of the gate set {u3,CZ}, decompose to the gate set {Rz,GR,CZ}.
@@ -111,7 +111,6 @@ def decompose_to_neutral_atom_gate_set(schedule,n,decomposition_type='transverse
         - schedule: list of moments, in the order they appear in the circuit.
                     Each moment is a list of CircuitInstruction objects and contains only u3 or only CZ gates
                     (i.e., a CZ gate and u3 gate cannot appear within the same moment). 
-        - n: number of qubits in the circuit.
         - decomposition_type: 'axial' or 'transverse'
         - use_backlog: if True, for each u3 moment, the last column of Rz gates is combined with the first column 
                        of Rz gates in the next u3 moment. This reduces total Rz gate cost in the circuit. 
@@ -125,10 +124,9 @@ def decompose_to_neutral_atom_gate_set(schedule,n,decomposition_type='transverse
                               Used in calculating circuit durations with get_time_cost_data.
     '''
     
-    assert decomposition_type in ['axial','transverse','baseline'], 'Supported decomposition types: axial, transverse, baseline'
-    if decomposition_type=='baseline':
-        return decompose_using_prev_existing_baseline(schedule,n)
-    
+    assert decomposition_type in ['axial','transverse'], 'Supported decomposition types: axial, transverse'
+
+    n = len(schedule.circuit.qubits)
     qr = qiskit.QuantumRegister(n)
     c = qiskit.QuantumCircuit(qr)
     
@@ -137,7 +135,7 @@ def decompose_to_neutral_atom_gate_set(schedule,n,decomposition_type='transverse
     if use_backlog:
         backlog = np.zeros(n)
         
-    for moment in schedule:
+    for moment in schedule.schedule:
         if len(moment)==0:
             continue
 
@@ -146,18 +144,19 @@ def decompose_to_neutral_atom_gate_set(schedule,n,decomposition_type='transverse
                         isinstance(op[0],qiskit.circuit.library.standard_gates.z.CCZGate) 
                         for op in moment]), 'Input circuit should be in gate set {u3,cz,ccz}'
             for op in moment:
-                c.append(op[0],qargs=[qr[qubit.index] for qubit in op[1]])
-            decomposed_moments.append(MultiQubitGateMoment([tuple(qubit.index for qubit in op[1]) for op in moment]))
+                c.append(op[0],qargs=[qr[schedule.circuit.find_bit(qubit).index] for qubit in op[1]])
+            decomposed_moments.append(MultiQubitGateMoment([tuple(schedule.circuit.find_bit(qubit).index 
+                                                                  for qubit in op[1]) for op in moment]))
 
         else: # Single-Qubit Gate Moment (SQGM) --> need to decompose
             assert all([len(op[1])==1 for op in moment]),'Cannot have 1-qubit and 2-qubit gates in same moment'
 
             # get angles to use for Rz and GR gates in the decomposition
             if decomposition_type=='axial':
-                decomposition_angles = get_axial_decomposition_angles(moment,eta=eta)
+                decomposition_angles = get_axial_decomposition_angles(moment,schedule.circuit,eta=eta)
             else:
                 assert decomposition_type=='transverse', 'Supported decomposition types: axial, transverse'
-                decomposition_angles = get_transverse_decomposition_angles(moment,eta=eta,
+                decomposition_angles = get_transverse_decomposition_angles(moment,schedule.circuit,eta=eta,
                                                                            sign_theta_max=sign_theta_max,
                                                                            sign_sigma_j=sign_sigma_j)
                 if round(decomposition_angles['gr']['first']['theta'],5)==0:

@@ -2,9 +2,9 @@ import qiskit
 
 class Schedule:
 
-    def __init__(self,schedule,orig_circuit):
+    def __init__(self,schedule,circuit):
         self.schedule = schedule
-        self.orig_circuit = orig_circuit
+        self.circuit = circuit
 
     def get_schedule_GR_cost(self):
         final_cost = 0
@@ -14,7 +14,7 @@ class Schedule:
         return round(final_cost,3)
 
     def print_schedule(self, with_angles=False):
-        c = self.orig_circuit
+        c = self.circuit
         i = 0
         for moment in self.schedule:
             tab = '     ' if i<10 else '    '
@@ -36,10 +36,10 @@ class Schedule:
             i+=1
 
     def get_circuit_from_schedule_with_barriers(self):
-        n = len(self.orig_circuit.qubits)
+        n = len(self.circuit.qubits)
         circuit = qiskit.QuantumCircuit(n)
         for moment in self.schedule:
             for op in moment:
-                circuit.append(op[0],[self.orig_circuit.find_bit(q).index for q in op[1]])
+                circuit.append(op[0],[self.circuit.find_bit(q).index for q in op[1]])
             circuit.barrier([q for q in range(n)])
         return circuit
