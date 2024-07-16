@@ -3,8 +3,9 @@ import itertools
 import networkx as nx
 
 from .sift import sift, circuit_to_dag
+from .schedule_class import Schedule
 
-def get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond):
+def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond):
         
     # initializations
     v_p1_star = [node for node in v_p1]
@@ -23,14 +24,14 @@ def get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
     v_c0.sort(key=lambda x: float(dag_node_to_gate[x][0].params[0]), reverse=True)
     potential_arg_info = []
     prev_theta_value = round(abs(float(dag_node_to_gate[v_c0[0]][0].params[0])),5)
-    qubits_to_check = [dag_node_to_gate[v_c0[0]][1][0].index]
+    qubits_to_check = [c.find_bit(dag_node_to_gate[v_c0[0]][1][0]).index]
     for i in range(1,len(v_c0)):
         this_op_theta_value = round(float(dag_node_to_gate[v_c0[i]][0].params[0]),5)
         if this_op_theta_value!=prev_theta_value:
             potential_arg_info.append((v_c0[i:],v_c0[:i],qubits_to_check,this_op_theta_value))
             prev_theta_value = this_op_theta_value
             qubits_to_check = []
-        qubits_to_check.append(dag_node_to_gate[v_c0[i]][1][0].index)
+        qubits_to_check.append(c.find_bit(dag_node_to_gate[v_c0[i]][1][0]).index)
 
     
     for M_k,m_k,qubits_to_check,max_theta in potential_arg_info: 
@@ -41,7 +42,7 @@ def get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
         nodes_to_push_back = []
         vp1_square_qubits_just_added = set()
         for node in v_p1_star:
-            node_qubits = set([q.index for q in dag_node_to_gate[node][1]])
+            node_qubits = set([c.find_bit(q).index for q in dag_node_to_gate[node][1]])
             if not node_qubits.isdisjoint(qubits_to_check):
                 nodes_to_push_back.append(node)
                 vp1_square_qubits_just_added.update(node_qubits)
@@ -55,7 +56,7 @@ def get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
         # check condition 3 (m_k doesn't make up its own SQGM)
         nodes_to_push_back = []
         for node in v_c1_star:
-            node_qubits = set([q.index for q in dag_node_to_gate[node][1]])
+            node_qubits = set([c.find_bit(q).index for q in dag_node_to_gate[node][1]])
             if not node_qubits.isdisjoint(vp1_square_qubits_just_added):
                 nodes_to_push_back.append(node)
         for node in nodes_to_push_back:
@@ -75,7 +76,7 @@ def get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
 
     return args
 
-def dp(v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_moments,
+def dp(c,v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_moments,
        prev_node,node_count,memo,check_last_cond):
 
     # check if solution already computed
@@ -94,12 +95,12 @@ def dp(v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_mo
     
     # recursive/dp case
     v_p1,v_c1,v_rem = sift(v_rem,dag_node_to_gate,n)
-    args = get_next_dp_args_list(v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
+    args = get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond)
     cost_list = []
     for new_v_c0,new_v_p1,new_v_c1,new_v_rem,new_vc0_cost in args:
         new_node = add_node_to_subproblem_graph(v_p0,new_v_c0,new_vc0_cost,
                                                 subproblem_graph,subproblem_node_to_moments,prev_node,node_count)
-        cost_list.append(dp(new_v_p1,new_v_c1,new_v_rem,dag_node_to_gate,n,subproblem_graph,
+        cost_list.append(dp(c,new_v_p1,new_v_c1,new_v_rem,dag_node_to_gate,n,subproblem_graph,
                             subproblem_node_to_moments,new_node,node_count,memo,check_last_cond) + new_vc0_cost)   
     cost = min(cost_list)
     memo[id_] = (cost, new_node, new_vc0_cost)
@@ -151,7 +152,7 @@ def get_theta_opt_schedule(circuit,check_last_cond=False,return_node_label_sched
     subproblem_graph.add_node(-1)
     subproblem_node_to_moments = {}
     
-    _ = dp(v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_moments,-1,[0],{},check_last_cond)
+    _ = dp(circuit,v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_moments,-1,[0],{},check_last_cond)
     schedule = build_schedule_from_subproblem_graph(subproblem_graph,subproblem_node_to_moments,dag_node_to_gate,
                                                     return_node_label_schedule=return_node_label_schedule)
-    return schedule
+    return Schedule(schedule,circuit)

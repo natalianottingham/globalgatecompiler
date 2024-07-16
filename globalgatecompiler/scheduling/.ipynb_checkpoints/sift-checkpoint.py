@@ -1,11 +1,12 @@
 import qiskit
 import networkx as nx
 
+from .schedule_class import Schedule
+
 def circuit_to_dag(circuit):
     '''
     Inputs:
         - circuit: Qiskit circuit to convert to DAG
-        - draw: if True, draws DAG labeled with node labels and gate type
     Outputs:
         - dag: networkx DAG representation of the input circuit
         - node_label_to_gate: Dict with keys given by DAG node labels (int) and values given by
@@ -37,48 +38,6 @@ def circuit_to_dag(circuit):
                 dag.add_edge(path[i],path[i+1])
         
     return dag,node_label_to_gate
-
-def sift_commute_cz(c,node_label_to_gate):
-    '''
-    Specialized version of the general sift function given below, which takes into account the fact that
-    CZ and CCZ gates can commute with each other. Assumes parallelism is maximized for single qubit gates,
-    so that v_caught contains U3 gates and v_passed contains CZ and CCZ. If a given CZ or CCZ gate is not 
-    disjoint from the set of qubits in v_remaining, but if the only gate it conflicts with is also a CZ or
-    CCZ gate (and not a U3 gate), it can commute past and be placed in v_passed.
-    
-    Note: in theory, there may exist a circuit in which this produces a better schedule than the general 
-    version of sift given below (which doesn't account for commutability of CZs and CCZs). In practice, 
-    however, we find it almost always gives the same schedule. Thus, in most cases, it makes sense to use 
-    the version below, which has slightly faster compile time complexity.
-    '''
-    
-    v_passed = []
-    v_caught = []
-    v_remaining = []
-    
-    u3_qubits = set() # qubits from u3 ops in v_caught and v_rem
-    cz_qubits = set() # qubits from cz ops in v_rem
-    
-    for node_label in c:
-        op = node_label_to_gate[node_label]
-        op_qubits = op.qubits
-        
-        if len(op[1])==1: # single-qubit gate
-            v_rem_caught_qubits = u3_qubits.union(cz_qubits)
-            if v_rem_caught_qubits.isdisjoint(op_qubits):
-                v_caught.append(node_label)
-            else:
-                v_remaining.append(node_label)
-            u3_qubits.update(op_qubits)
-            
-        else: # multi-qubit gate
-            if u3_qubits.isdisjoint(op_qubits):
-                v_passed.append(node_label)
-            else:
-                v_remaining.append(node_label)
-                cz_qubits.update(op_qubits)
-                
-    return v_passed, v_caught, v_remaining
 
 def sift(c,node_label_to_gate,num_qubits,indicator_fn=lambda op: len(op[1])==1):
     '''
@@ -151,5 +110,5 @@ def get_sifted_schedule(circuit,indicator_fn=lambda op: len(op[1])==1):
         schedule.append([node_label_to_gate[v] for v in v_caught])
         
     if len(schedule[0])==0: # scheduling sometimes occurs in a way such that first moment is empty
-        return schedule[1:] # return only the non-empty moments (empty moment irrelevant)
-    return schedule
+        return Schedule(schedule[1:],circuit) # return only the non-empty moments (empty moment irrelevant)
+    return Schedule(schedule,circuit)
