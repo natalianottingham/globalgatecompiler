@@ -3,7 +3,7 @@ import itertools
 import networkx as nx
 
 from .sift import sift, circuit_to_dag
-from .schedule_info import Schedule
+from .schedule_class import Schedule
 
 def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond):
         
@@ -14,7 +14,7 @@ def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_con
     v_c1_square = []
         
     v_c0_cost = max([float(dag_node_to_gate[node][0].params[0]) for node in v_c0])
-    v_c1_cost = max([float(dag_node_to_gate[node][0].params[0]) for node in v_c1])
+    v_c1_cost = max([float(dag_node_to_gate[node][0].params[0]) for node in v_c1]) if v_c1 else 0
     orig_vc0_plus_vc1_cost = v_c0_cost + v_c1_cost
     new_vc1_cost = max(v_c0_cost,v_c1_cost)
     
@@ -24,17 +24,17 @@ def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_con
     v_c0.sort(key=lambda x: float(dag_node_to_gate[x][0].params[0]), reverse=True)
     potential_arg_info = []
     prev_theta_value = round(abs(float(dag_node_to_gate[v_c0[0]][0].params[0])),5)
-    qubits_to_check = [c.find_bit(dag_node_to_gate[v_c0[0]][1][0]).index]
+    mk_qubits_just_added = [c.find_bit(dag_node_to_gate[v_c0[0]][1][0]).index]
     for i in range(1,len(v_c0)):
         this_op_theta_value = round(float(dag_node_to_gate[v_c0[i]][0].params[0]),5)
         if this_op_theta_value!=prev_theta_value:
-            potential_arg_info.append((v_c0[i:],v_c0[:i],qubits_to_check,this_op_theta_value))
+            potential_arg_info.append((v_c0[i:],v_c0[:i],mk_qubits_just_added,this_op_theta_value))
             prev_theta_value = this_op_theta_value
-            qubits_to_check = []
-        qubits_to_check.append(c.find_bit(dag_node_to_gate[v_c0[i]][1][0]).index)
+            mk_qubits_just_added = []
+        mk_qubits_just_added.append(c.find_bit(dag_node_to_gate[v_c0[i]][1][0]).index)
 
     
-    for M_k,m_k,qubits_to_check,max_theta in potential_arg_info: 
+    for M_k,m_k,mk_qubits_just_added,max_theta in potential_arg_info: 
     # iterate through each unique theta value (this guarantees condition 1 is satisfied)
     # starts with largest theta (sorted in reverse order above)
             
@@ -43,7 +43,7 @@ def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_con
         vp1_square_qubits_just_added = set()
         for node in v_p1_star:
             node_qubits = set([c.find_bit(q).index for q in dag_node_to_gate[node][1]])
-            if not node_qubits.isdisjoint(qubits_to_check):
+            if not node_qubits.isdisjoint(mk_qubits_just_added):
                 nodes_to_push_back.append(node)
                 vp1_square_qubits_just_added.update(node_qubits)
         for node in nodes_to_push_back:
@@ -57,7 +57,7 @@ def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_con
         nodes_to_push_back = []
         for node in v_c1_star:
             node_qubits = set([c.find_bit(q).index for q in dag_node_to_gate[node][1]])
-            if not node_qubits.isdisjoint(vp1_square_qubits_just_added):
+            if not node_qubits.isdisjoint(vp1_square_qubits_just_added.union(mk_qubits_just_added)):
                 nodes_to_push_back.append(node)
         for node in nodes_to_push_back:
             v_c1_star.remove(node)
@@ -88,7 +88,7 @@ def dp(c,v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_
     
     # base case
     if len(v_rem)==0:
-        base_case_cost = float(dag_node_to_gate[v_c0[0]][0].params[0]) # max theta in v_c0 (v_c0 sorted in reverse order)
+        base_case_cost = float(dag_node_to_gate[v_c0[0]][0].params[0]) if v_c0 else 0 # max theta in v_c0 (v_c0 sorted in reverse)
         _ = add_node_to_subproblem_graph(v_p0,v_c0,base_case_cost,
                                          subproblem_graph,subproblem_node_to_moments,prev_node,node_count)
         return base_case_cost
