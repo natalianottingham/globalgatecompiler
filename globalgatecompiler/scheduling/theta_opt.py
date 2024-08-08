@@ -6,6 +6,11 @@ from .sift import sift, circuit_to_dag
 from .schedule_class import Schedule
 
 def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_cond):
+    '''
+    Checks the conditions discussed in Sec. V-D of our paper. Returns a list of moments
+    that could potentially be scheduled as the next SQGM; these moments must satisfy the 
+    conditions and must respect dependencies in the circuit. 
+    '''
         
     # initializations
     v_p1_star = [node for node in v_p1]
@@ -78,6 +83,12 @@ def get_next_dp_args_list(c,v_c0,v_p1,v_c1,v_rem,dag_node_to_gate,check_last_con
 
 def dp(c,v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_moments,
        prev_node,node_count,memo,check_last_cond):
+    '''
+    Implements one dynamic programming call on the subproblem defined by the remaining gates
+    that have not yet been scheduled. Returns the cost of scheduling the remaining part of the
+    circuit while minimizing the objective given in Eq. 17 in Sec. V-C. Base case occurs when 
+    there are no more remaining gates to schedule.
+    '''
 
     # check if solution already computed
     id_ = ','.join(str(i) for i in v_p0)+';'+','.join(str(i) for i in v_c0)+';'+','.join(str(i) for i in v_rem)
@@ -107,6 +118,12 @@ def dp(c,v_p0,v_c0,v_rem,dag_node_to_gate,n,subproblem_graph,subproblem_node_to_
     return cost
 
 def add_node_to_subproblem_graph(vp,vc,vc_cost,subproblem_graph,subproblem_node_to_moments,prev_node,node_count):
+    '''
+    Add a node to the "subproblem graph", where each node represents a dynamic programming call, and
+    directed edges go from parent to child calls. Associated with each node is the v_passed and v_caught
+    moments that were added to the schedule during that dynamic programming call, and each edge weight is
+    equal to the cost of the v_caught moment (according to Eq. 17) of the node on the edge's ingoing end.
+    '''
     new_node = node_count[0]
     node_count[0] += 1
     subproblem_graph.add_node(new_node)
@@ -116,6 +133,10 @@ def add_node_to_subproblem_graph(vp,vc,vc_cost,subproblem_graph,subproblem_node_
 
 def build_schedule_from_subproblem_graph(subproblem_graph,subproblem_node_to_moments,
                                          dag_node_to_gate,return_node_label_schedule):
+    '''
+    Once all dynamic programming calls have been completed, use the subproblem graph to 
+    determine the full schedule that has the lowest cost.
+    '''
     
     # find path in subproblem graph with the lowest weight (i.e. path with best cost)
     leaf_nodes = [node for node in subproblem_graph.nodes() if subproblem_graph.out_degree(node)==0]
@@ -142,6 +163,11 @@ def build_schedule_from_subproblem_graph(subproblem_graph,subproblem_node_to_mom
     return schedule
 
 def get_theta_opt_schedule(circuit,check_last_cond=False,return_node_label_schedule=False):
+    '''
+    Schedules the circuit using the Theta-Opt method, which minimizes the total GR rotation amount
+    of the final circuit once decomposed into the gate set {Rz,GR,CZ,CCZ}.
+    '''
+    
     n = len(circuit.qubits)
     
     dag, dag_node_to_gate = circuit_to_dag(circuit)

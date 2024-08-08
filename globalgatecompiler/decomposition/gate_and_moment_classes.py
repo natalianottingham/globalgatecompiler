@@ -89,11 +89,8 @@ class MultiQubitGateMoment:
         Determine which CZ & CCZ gates can be executed in parallel, and based on that, calculate duration.
         
         More than one multi-qubit gate can be executed in parallel iff both conditions are satisfied:
-            - subsets of the qubits acted on by the gates are disjoint. 
-            - blockade radii of operands of *different* gates do not overlap, i.e.,
-               
-        E.g., CZ(qa,qb) and CZ(qc,qd) can execute in parallel if {qa,qb} and {qc,qd} are disjoint and 
-              if (qa,qc), (qa,qd), (qb,qc), (qb,qd) are *not* in the edge set of the connectivity graph.
+            - subsets of the qubits acted on by the gates are disjoint
+            - blockade radii of operands of *different* gates do not overlap
         '''
         
         initial_set = set()

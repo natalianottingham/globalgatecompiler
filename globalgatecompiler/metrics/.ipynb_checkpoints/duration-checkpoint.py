@@ -3,17 +3,19 @@ from ..decomposition.gate_and_moment_classes import RzMoment, GRMoment, MultiQub
 def get_time_cost_data(decomposed_moments,rz_pi_duration,gr_pi_duration,cz_duration,ccz_duration,connectivity_graph=None):
     '''
     Inputs: 
-        - decomposed_moments: list of moments in the entire circuit, ordered by when they appear in the 
-                              circuit; each moment is of class RzMoment, GRMoment, or CZMoment
-        - gate_durations: Dict with keys 'rz', 'gr', and 'mqgm' giving the gate durations. Single-qubit
-                          durations ('rz' and 'gr') in input Dict are specified for a rotation amount 
-                          of pi; gate durations are scaled by rotation amount in "set_duration" method. 
-                          data['mqgm'] accounts for both CZ and CCZ gates.
+        - decomposed_moments: list of moments in the circuit, in the order that they appear in the circuit; 
+                              each moment is an object of class RzMoment, GRMoment, or MultiQubitGateMoment.
+        - rz_pi_duration: time required to execute an Rz gate with rotation angle of pi. 
+                          (duration of each Rz gate in the circuit is scaled by rotation amount)
+        - gr_pi_duration: time required to execute an GR gate with rotation angle of pi.
+                          (duration of each GR gate in the circuit is scaled by rotation amount)
+        - cz_duration: time required to execute a CZ gate.
+        - ccz_duration: time required to execute a CCZ gate. 
                           
     Output: 
-        - data: Dict giving the amount of time spent executing gates in each category ('rz','gr','cz')
+        - data: Dict giving the amount of time spent executing gates in each category ('rz','gr','multi')
                 over the entire circuit that was specified by the input moments. Overall duration for the
-                entire circuit is given by data['total']. 
+                entire circuit is given by data['total']. The category 'multi' includes CZ and CCZ gates.
     '''
     
     if decomposed_moments[0].duration==None:

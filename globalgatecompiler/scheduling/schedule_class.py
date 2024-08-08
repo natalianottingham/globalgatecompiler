@@ -7,6 +7,10 @@ class Schedule:
         self.circuit = circuit
 
     def get_schedule_GR_cost(self):
+        '''
+        Calculates the total GR rotation amount of the final circuit 
+        if the schedule is decomposed using the transverse decomposition.
+        '''
         final_cost = 0
         for moment in self.schedule:
             if len(moment)!=0 and len(moment[0][1])==1:
@@ -14,6 +18,11 @@ class Schedule:
         return round(final_cost,3)
 
     def print_schedule(self, with_angles=False):
+        '''
+        Prints the schedule in a way that is easier to read. If with_angles is set to False, will print only 
+        the gate type and qubits for each gate, where each line printed contains gates in the same moment. If 
+        with_angles is True, will also include the Euler angle parameters for each u3 gate.
+        '''
         c = self.circuit
         i = 0
         for moment in self.schedule:
@@ -36,6 +45,11 @@ class Schedule:
             i+=1
 
     def get_circuit_from_schedule_with_barriers(self):
+        '''
+        Returns the same circuit but with barrier gates separating different moments. Note this is not used in 
+        any of the code for our optimizations and/or compilation passes; rather, this provides a simple way to 
+        visualize how the circuit is split into moments, using Qiskit's circuit.draw() method."
+        '''
         n = len(self.circuit.qubits)
         circuit = qiskit.QuantumCircuit(n)
         for moment in self.schedule:

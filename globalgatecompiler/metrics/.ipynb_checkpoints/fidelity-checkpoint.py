@@ -3,6 +3,25 @@ import numpy as np
 
 def get_fidelity_cost_data(decomposed_moments,rz_constant,gr_constant,cz_fidelity,ccz_fidelity,t2_star,
                            rz_pi_duration=None,gr_pi_duration=None,cz_duration=None,ccz_duration=None,connectivity_graph=None):
+
+    '''
+    Inputs: 
+        - decomposed_moments: list of moments in the circuit, in the order that they appear in the circuit; 
+                              each moment is an object of class RzMoment, GRMoment, or MultiQubitGateMoment.
+        - rz_constant: constant used for calculating fidelity of Rz gates, based on the specific hardware/device.
+                       (See Sec. VI-B in our paper for more details)
+        - gr_constant: constant used for calculating fidelity of GR gates, based on the specific hardware/device.
+                       (See Sec. VI-B in our paper for more details)
+        - cz_duration: fidelity of a single CZ gate.
+        - ccz_duration: fidelity of a single CCZ gate. 
+        - t2_star: coherence time (dephasing).
+        *** gate durations and connectivity graph must be input if get_time_cost_data has not already been run ***
+                          
+    Output: 
+        - data: Dict giving information on the circuit's fidelity; data['gate'] is the circuit fidelity when only
+                gate errors are considered, and data['idle'] is circuit fidelity when only considering idle errors.
+                The circuit's overall fidelity, given by data['total'] is the product of these two values.
+    '''
     
     if decomposed_moments[0].duration==None:
         assert rz_pi_duration!=None

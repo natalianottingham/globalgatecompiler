@@ -6,9 +6,9 @@ from .schedule_class import Schedule
 def circuit_to_dag(circuit):
     '''
     Inputs:
-        - circuit: Qiskit circuit to convert to DAG
+        - circuit: Qiskit circuit to convert to a directed acyclic graph (DAG).
     Outputs:
-        - dag: networkx DAG representation of the input circuit
+        - dag: networkx DAG representation of the input circuit.
         - node_label_to_gate: Dict with keys given by DAG node labels (int) and values given by
                               gate (CircuitInstruction) corresponding to the node in the DAG. 
     '''
@@ -41,12 +41,26 @@ def circuit_to_dag(circuit):
 
 def sift(c,node_label_to_gate,num_qubits,indicator_fn=lambda op: len(op[1])==1):
     '''
-    Given the remaining part of circuit that has not been scheduled yet, find the next groups of gates
-    that can be scheduled. Gates with indicator function returning "True" that can be scheduled during 
-    this round of sifting are "caught" by the sifter (added to the set v_caught). Gates of the other gate
-    type that can be scheduled during this round are "passed" by the sifter (added to the set v_passed). 
-    Gates in v_caught are scheduled to the same moment, and gates in v_passed are scheduled to the same 
-    moment. All other gates are added to the set v_remaining and are scheduled during later sifting rounds.
+    Given the remaining part of circuit that has not been scheduled yet, find the next two moments of gates
+    following the steps outlined in Alg.1 and Sec. V-B of our paper. 
+
+    Inputs:
+        - c: the remaining part of the circuit that has yet to be scheduled.
+        - node_label_to_gate: Dict with keys given by DAG node labels (int) and values given by
+                              gate (CircuitInstruction) corresponding to the node in the DAG. 
+        - num_qubits: the number of qubits in the circuit.
+        - indicator_fn: defines the categories of gates, where gates in different categories cannot 
+                        be scheduled to the same moment, and parallelism is maximized for the 
+                        gate type with indicator function value of 1 (True). 
+    Outputs:
+        - v_passed: moment of gates such that 0 (False) is returned when input into the indicator function
+                    and all dependencies have already been scheduled; v_passed is added as the next moment
+                    in the circuit.
+        - v_caught: moment of gates such that 1 (True) is returned when input into the indicator function
+                    and all dependencies have already been scheduled (either in previous sift calls or in
+                    the v_passed moment returned by this sift call); v_caught is added as the next moment
+                    after v_passed.
+        - v_remaining: all remaining gates which will be scheduled by later calls to sift.
     
     When in DAG form, C_caught, C_passed, and C_remaining form mutually disjoint subsets of the circuit C 
     input into the sift function. Concatenating C_caught, C_passed, and C_remaining gives the original 
@@ -77,26 +91,20 @@ def sift(c,node_label_to_gate,num_qubits,indicator_fn=lambda op: len(op[1])==1):
 
 def get_sifted_schedule(circuit,indicator_fn=lambda op: len(op[1])==1):
     '''
-    Given circuit, convert to DAG form and repeatedly call the sift function (which maximizes parallelism 
-    of the specified gate type) until all gates have been scheduled. We assume the circuit (corresponding to 
-    the input DAG) has previously been transpiled to the gate set {u3,CZ}, and that each moment in the output 
-    schedule contains only one type of gate (i.e., a u3 gate and CZ gate cannot be scheduled into the same moment). 
-    This is necessary to later decompose the circuit into the neutral atom gate set {Rz,GR,CZ}. 
-    [Note, however, this code can be easily adjusted to account for other gate types if necessary.]
-    
-    Maximizing parallelism of u3 gates will minimize the total number of GR gates when the circuit is 
-    decomposed to {Rz,GR,CZ}. This is motivated by the fact that GR gates often dominate gate durations, 
-    especially on architectures where GR gates are implemented using microwave beams. However, maximizing
-    u3 gate parallelism may result in less CZ gate parallelism. Thus, especially on architectures where CZ
-    gate times are dominant, maximizing parallelism of u3 gates may not lead to the optimal circuit duration.
+    Schedules a circuit using repeated calls to sift, as described in Sec. V-B of our paper.
+    If indicator_fn is set to the default, single-qubit gate parallelism is maximized; assuming the
+    circuit has previously been transpiled to {u3,CZ,CCZ}, maximizing u3 parallelism during scheduling
+    will result in a final circuit with the minimum possible number of GR gates, once decomposed to the
+    gate set {Rz,GR,CZ,CCZ}. 
     
     Inputs:
         - circuit: Qiskit circuit to be scheduled.
-        - indicator_fn: determines which gate type has parallelism maximized when scheduling.
+        - indicator_fn: defines the categories of gates, where gates in different categories cannot 
+                        be scheduled to the same moment, and parallelism is maximized for the 
+                        gate type with indicator function value of 1 (True). 
 
     Outputs: 
-        - schedule: list of moments in the order they appear in the schedule, where each moment is
-                    a list of CircuitInstruction objects that are scheduled to in execute in parallel.
+        - schedule: list of moments in the order they appear in the schedule.
     '''
     n = len(circuit.qubits)
     

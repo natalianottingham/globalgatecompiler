@@ -22,7 +22,8 @@ def get_axial_decomposition_angles(moment,circuit,eta=0):
     Eta can be changed to optimize Rz rotation amount in the final circuit.
     
     Input: 
-        - moment: list of CircuitInstruction objects, each of which specifies a u3 gate.
+        - moment: list of CircuitInstruction objects, each of which specifies a u3 gate;
+                  we assume that there is at most one gate on each qubit in the input moment.
     Output:
         - dict specifying Rz and GR angles in the decomposition:
             angles_all['rz']['first'][q]: rotation angle for Rz gate in first column on qubit q
@@ -57,7 +58,7 @@ def get_axial_decomposition_angles(moment,circuit,eta=0):
 
 def get_transverse_decomposition_angles(moment,circuit,eta=0,sign_theta_max=1,sign_sigma_j=1):
     '''
-    Similar to get_axial_decomposition_angles, except using transverse decomposition method. 
+    Similar to get_axial_decomposition_angles, except applying the transverse decomposition method. 
     For a given moment of u3 gates, the transverse decomposition minimizes GR rotation amount.
     Eta, sign_theta_max, sigma_j can be changed to optimize Rz rotation amount in the final circuit.
     '''
@@ -105,12 +106,12 @@ def get_transverse_decomposition_angles(moment,circuit,eta=0,sign_theta_max=1,si
 def decompose_to_neutral_atom_gate_set(schedule,decomposition_type='transverse',use_backlog=True,
                                        eta=0,sign_theta_max=1,sign_sigma_j=1):
     '''
-    Given a circuit in terms of the gate set {u3,CZ}, decompose to the gate set {Rz,GR,CZ}.
+    Given a circuit in terms of the gate set {u3,CZ,CCZ}, decompose to the gate set {Rz,GR,CZ,CCZ}.
     
     Inputs:
         - schedule: list of moments, in the order they appear in the circuit.
-                    Each moment is a list of CircuitInstruction objects and contains only u3 or only CZ gates
-                    (i.e., a CZ gate and u3 gate cannot appear within the same moment). 
+                    Each moment is a list of CircuitInstruction objects and contains only u3 or only CZ/CCZ gates
+                    (i.e., a CZ/CCZ gate and u3 gate cannot appear within the same moment). 
         - decomposition_type: 'axial' or 'transverse'
         - use_backlog: if True, for each u3 moment, the last column of Rz gates is combined with the first column 
                        of Rz gates in the next u3 moment. This reduces total Rz gate cost in the circuit. 
@@ -120,8 +121,8 @@ def decompose_to_neutral_atom_gate_set(schedule,decomposition_type='transverse',
     
     Outputs: 
         - c: the decomposed circuit.
-        - decomposed_moments: list of RzMoment, GRMoment, and CZMoment objects.
-                              Used in calculating circuit durations with get_time_cost_data.
+        - decomposed_moments: list of RzMoment, GRMoment, and MultiQubitGateMoment objects, in the order they
+                              appear in the circuit. This is used as input when calculating fidelity and duration.
     '''
     
     assert decomposition_type in ['axial','transverse'], 'Supported decomposition types: axial, transverse'
