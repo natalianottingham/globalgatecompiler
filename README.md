@@ -21,7 +21,6 @@ networkx 3.3
 See the provided `tutorial_notebook.ipynb` for detailed examples and explanations of how to use our code.
 
 ### CITING OUR CODE:
-If you use our code in your work, please cite the corresponding paper:<br>
-[will add citation info once publication comes out]
+If you use our code in your work, please cite the corresponding paper: [arXiv:2307.14996v2](https://arxiv.org/abs/2307.14996v2) 
 
 For further questions/comments about our code: nottingham@uchicago.edu
